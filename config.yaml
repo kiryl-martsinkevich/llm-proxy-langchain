@@ -1,0 +1,27 @@
+# Model mappings - map Anthropic model names to backends
+models:
+  claude-3-opus-20240229:
+    backend: databricks
+    model: databricks-meta-llama-3-1-70b-instruct
+
+  claude-3-sonnet-20240229:
+    backend: databricks
+    model: databricks-meta-llama-3-1-70b-instruct
+
+  claude-3-haiku-20240307:
+    backend: ollama
+    model: llama3.2
+
+# Backend configurations
+backends:
+  ollama:
+    base_url: "http://localhost:11434/v1"
+
+  databricks:
+    base_url: "${DATABRICKS_HOST}/serving-endpoints"
+    api_key: "${DATABRICKS_TOKEN}"
+
+# Server settings
+server:
+  host: "0.0.0.0"
+  port: 8080
