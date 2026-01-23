@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 import uvicorn
+from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from llm_proxy.auth import APIKeyAuth
@@ -61,6 +62,9 @@ except Exception:
 
 def main():
     """Run the application with uvicorn."""
+    # Load .env file if it exists
+    load_dotenv()
+
     host = os.environ.get("LLM_PROXY_HOST", "127.0.0.1")
     port = int(os.environ.get("LLM_PROXY_PORT", "8000"))
     uvicorn.run(create_app, host=host, port=port, reload=False, factory=True)
