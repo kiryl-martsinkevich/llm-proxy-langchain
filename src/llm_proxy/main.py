@@ -65,8 +65,13 @@ def main():
     # Load .env file if it exists
     load_dotenv()
 
-    host = os.environ.get("LLM_PROXY_HOST", "127.0.0.1")
-    port = int(os.environ.get("LLM_PROXY_PORT", "8000"))
+    # Load config to get server settings
+    config_path = Path(os.environ.get("LLM_PROXY_CONFIG", "config.yaml"))
+    config = load_config(config_path)
+
+    # Use config values, with env var overrides
+    host = os.environ.get("LLM_PROXY_HOST", config.server.get("host", "127.0.0.1"))
+    port = int(os.environ.get("LLM_PROXY_PORT", config.server.get("port", 8000)))
     uvicorn.run(create_app, host=host, port=port, reload=False, factory=True)
 
 
