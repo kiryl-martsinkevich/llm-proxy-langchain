@@ -68,9 +68,17 @@ def main():
 
     # Configure logging
     log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+    log_file = os.environ.get("LOG_FILE")
+
+    handlers = [logging.StreamHandler()]
+    if log_file:
+        handlers.append(logging.FileHandler(log_file))
+
     logging.basicConfig(
         level=getattr(logging, log_level),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        handlers=handlers,
+        force=True,  # Override any existing config
     )
 
     # Load config to get server settings

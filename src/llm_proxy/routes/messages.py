@@ -91,8 +91,13 @@ def create_messages_router(config: ProxyConfig) -> APIRouter:
     async def create_message(request: MessagesRequest) -> MessagesResponse:
         """Handle POST /v1/messages."""
         # Log incoming request
-        logger.info(f"Request model={request.model} stream={request.stream} tools={len(request.tools) if request.tools else 0}")
-        logger.debug(f"Request messages count={len(request.messages)}")
+        logger.info(f">>> REQUEST model={request.model} stream={request.stream} tools={len(request.tools) if request.tools else 0} messages={len(request.messages)}")
+
+        # Log last message content (truncated) for debugging
+        if request.messages:
+            last_msg = request.messages[-1]
+            content_preview = str(last_msg.content)[:200] if last_msg.content else ""
+            logger.info(f">>> LAST_MSG role={last_msg.role} content_preview={content_preview}...")
 
         # Resolve backend for the requested model
         try:
@@ -132,7 +137,16 @@ def create_messages_router(config: ProxyConfig) -> APIRouter:
 
         # Translate response to Anthropic format
         response = translate_response(ai_message, request.model)
-        logger.info(f"Response stop_reason={response.stop_reason} content_blocks={len(response.content)}")
+
+        # Log response details
+        content_types = [block.type for block in response.content]
+        logger.info(f"<<< RESPONSE stop_reason={response.stop_reason} content_types={content_types}")
+        for block in response.content:
+            if block.type == "tool_use":
+                logger.info(f"<<< TOOL_USE name={block.name} id={block.id}")
+            elif block.type == "text":
+                logger.info(f"<<< TEXT preview={block.text[:200]}...")
+
         return response
 
     return router
