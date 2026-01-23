@@ -78,17 +78,10 @@ def translate_tools(tools: list[Tool]) -> list[dict[str, Any]]:
     ]
 
 
-# Max output tokens supported by common models
-MAX_OUTPUT_TOKENS = 16384  # gpt-4o-mini, gpt-4o limit
-
-
 def build_langchain_kwargs(request: MessagesRequest) -> dict[str, Any]:
     """Build kwargs for LangChain model invocation."""
-    # Cap max_tokens to model limit
-    max_tokens = min(request.max_tokens, MAX_OUTPUT_TOKENS)
-
     kwargs: dict[str, Any] = {
-        "max_tokens": max_tokens,
+        "max_tokens": request.max_tokens,
     }
 
     if request.temperature is not None:
