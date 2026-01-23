@@ -1,10 +1,14 @@
 """Messages endpoint handler."""
 
+import json
+import logging
 from typing import AsyncGenerator
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
+
+logger = logging.getLogger(__name__)
 
 from llm_proxy.backends.factory import create_chat_model
 from llm_proxy.backends.router import BackendNotFoundError, resolve_backend
@@ -86,11 +90,17 @@ def create_messages_router(config: ProxyConfig) -> APIRouter:
     @router.post("/v1/messages")
     async def create_message(request: MessagesRequest) -> MessagesResponse:
         """Handle POST /v1/messages."""
+        # Log incoming request
+        logger.info(f"Request model={request.model} stream={request.stream} tools={len(request.tools) if request.tools else 0}")
+        logger.debug(f"Request messages count={len(request.messages)}")
+
         # Resolve backend for the requested model
         try:
             backend_config, backend_model = resolve_backend(request.model, config)
         except BackendNotFoundError as e:
             return make_error_response(400, "invalid_request_error", str(e))
+
+        logger.info(f"Routing to backend model={backend_model}")
 
         # Create LangChain model
         chat_model = create_chat_model(backend_config, backend_model)
@@ -102,10 +112,12 @@ def create_messages_router(config: ProxyConfig) -> APIRouter:
         # Bind tools if present
         if request.tools:
             tools = translate_tools(request.tools)
+            logger.debug(f"Bound {len(tools)} tools")
             chat_model = chat_model.bind_tools(tools)
 
         # Handle streaming separately
         if request.stream:
+            logger.info("Starting streaming response")
             return EventSourceResponse(
                 _stream_response(chat_model, messages, kwargs, request.model)
             )
@@ -113,11 +125,14 @@ def create_messages_router(config: ProxyConfig) -> APIRouter:
         # Invoke the model
         try:
             ai_message = await chat_model.ainvoke(messages, **kwargs)
+            logger.debug(f"Backend response: content_len={len(ai_message.content) if ai_message.content else 0} tool_calls={len(ai_message.tool_calls) if ai_message.tool_calls else 0}")
         except Exception as e:
+            logger.error(f"Backend error: {e}")
             return make_error_response(502, "api_error", f"Backend error: {str(e)}")
 
         # Translate response to Anthropic format
         response = translate_response(ai_message, request.model)
+        logger.info(f"Response stop_reason={response.stop_reason} content_blocks={len(response.content)}")
         return response
 
     return router

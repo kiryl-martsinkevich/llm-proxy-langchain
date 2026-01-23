@@ -1,5 +1,6 @@
 """FastAPI application entry point."""
 
+import logging
 import os
 from pathlib import Path
 
@@ -64,6 +65,13 @@ def main():
     """Run the application with uvicorn."""
     # Load .env file if it exists
     load_dotenv()
+
+    # Configure logging
+    log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+    logging.basicConfig(
+        level=getattr(logging, log_level),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
 
     # Load config to get server settings
     config_path = Path(os.environ.get("LLM_PROXY_CONFIG", "config.yaml"))
