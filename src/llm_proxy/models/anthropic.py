@@ -6,11 +6,18 @@ from pydantic import BaseModel
 
 
 # Content block types
+class CacheControl(BaseModel):
+    """Cache control for prompt caching."""
+
+    type: Literal["ephemeral"]
+
+
 class TextBlock(BaseModel):
     """Text content block."""
 
     type: Literal["text"]
     text: str
+    cache_control: CacheControl | None = None
 
 
 class ImageSource(BaseModel):
@@ -74,7 +81,7 @@ class MessagesRequest(BaseModel):
     model: str
     max_tokens: int
     messages: list[Message]
-    system: str | None = None
+    system: str | list[TextBlock] | None = None
     temperature: float | None = None
     top_p: float | None = None
     stop_sequences: list[str] | None = None

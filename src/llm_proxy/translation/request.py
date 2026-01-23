@@ -4,7 +4,7 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
-from llm_proxy.models.anthropic import Message, MessagesRequest, Tool
+from llm_proxy.models.anthropic import Message, MessagesRequest, TextBlock, Tool
 
 
 def translate_content_block(block: dict[str, Any]) -> dict[str, Any]:
@@ -43,13 +43,19 @@ def translate_message(msg: Message) -> BaseMessage:
 
 
 def translate_messages(
-    messages: list[Message], system: str | None
+    messages: list[Message], system: str | list[TextBlock] | None
 ) -> list[BaseMessage]:
     """Translate Anthropic messages to LangChain messages."""
     result: list[BaseMessage] = []
 
     if system:
-        result.append(SystemMessage(content=system))
+        # Handle both string and list of TextBlock formats
+        if isinstance(system, str):
+            result.append(SystemMessage(content=system))
+        else:
+            # Concatenate text from all system blocks
+            system_text = "\n".join(block.text for block in system)
+            result.append(SystemMessage(content=system_text))
 
     for msg in messages:
         result.append(translate_message(msg))
