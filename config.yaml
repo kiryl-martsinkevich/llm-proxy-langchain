@@ -4,7 +4,7 @@ models:
     backend: openai
     model: gpt-5.1
 
-  claude-sonnet-4-5-20251001:
+  claude-sonnet-4-5-20250929:
     backend: openai
     model: gpt-5-mini
 
