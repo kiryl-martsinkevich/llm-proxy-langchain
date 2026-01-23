@@ -1,7 +1,10 @@
 """Messages endpoint handler."""
 
+from typing import AsyncGenerator
+
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
+from sse_starlette.sse import EventSourceResponse
 
 from llm_proxy.backends.factory import create_chat_model
 from llm_proxy.backends.router import BackendNotFoundError, resolve_backend
@@ -12,7 +15,13 @@ from llm_proxy.translation.request import (
     translate_messages,
     translate_tools,
 )
-from llm_proxy.translation.response import translate_response
+from llm_proxy.translation.response import map_stop_reason, translate_response
+from llm_proxy.translation.streaming import (
+    StreamingState,
+    translate_stream_delta,
+    translate_stream_end,
+    translate_stream_start,
+)
 
 
 def make_error_response(
@@ -29,6 +38,45 @@ def make_error_response(
             },
         },
     )
+
+
+async def _stream_response(
+    chat_model, messages: list, kwargs: dict, model: str
+) -> AsyncGenerator[dict, None]:
+    """Stream response from LangChain model as SSE events.
+
+    Args:
+        chat_model: The LangChain chat model to use.
+        messages: Translated messages for the model.
+        kwargs: Additional kwargs for the model invocation.
+        model: The original model name from the request.
+
+    Yields:
+        SSE event dicts in Anthropic streaming format.
+    """
+    state = StreamingState(model=model)
+    finish_reason = None
+
+    # Emit start events
+    for event in translate_stream_start(state):
+        yield event
+
+    # Stream chunks from the model
+    async for chunk in chat_model.astream(messages, **kwargs):
+        # Track finish reason from response metadata
+        if hasattr(chunk, "response_metadata") and chunk.response_metadata:
+            finish_reason = chunk.response_metadata.get("finish_reason", finish_reason)
+
+        # Translate and yield delta events
+        for event in translate_stream_delta(chunk, state):
+            yield event
+
+    # Determine stop reason
+    stop_reason = map_stop_reason(finish_reason)
+
+    # Emit end events
+    for event in translate_stream_end(state, stop_reason):
+        yield event
 
 
 def create_messages_router(config: ProxyConfig) -> APIRouter:
@@ -58,9 +106,8 @@ def create_messages_router(config: ProxyConfig) -> APIRouter:
 
         # Handle streaming separately
         if request.stream:
-            # TODO: Implement streaming in Task 10
-            return make_error_response(
-                400, "invalid_request_error", "Streaming not yet implemented"
+            return EventSourceResponse(
+                _stream_response(chat_model, messages, kwargs, request.model)
             )
 
         # Invoke the model
