@@ -2,9 +2,9 @@
 
 import json
 import logging
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
@@ -111,7 +111,8 @@ def create_messages_router(config: ProxyConfig) -> APIRouter:
         chat_model = create_chat_model(backend_config, backend_model)
 
         # Translate request to LangChain format
-        messages = translate_messages(request.messages, request.system)
+        has_tools = bool(request.tools)
+        messages = translate_messages(request.messages, request.system, has_tools)
         kwargs = build_langchain_kwargs(request)
 
         # Bind tools if present
@@ -148,5 +149,26 @@ def create_messages_router(config: ProxyConfig) -> APIRouter:
                 logger.info(f"<<< TEXT preview={block.text[:200]}...")
 
         return response
+
+    @router.post("/v1/messages/count_tokens")
+    async def count_tokens(request: Request) -> dict[str, Any]:
+        """Handle POST /v1/messages/count_tokens.
+
+        Returns estimated token count. Uses rough estimate since
+        Claude Code handles inaccurate counts gracefully.
+        """
+        body = await request.body()
+        # Rough estimate: ~4 characters per token
+        estimate = max(1, len(body) // 4)
+        logger.debug(f"Token count estimate: {estimate}")
+        return {"input_tokens": estimate}
+
+    @router.post("/api/event_logging/batch")
+    async def event_logging_batch() -> dict[str, str]:
+        """Handle POST /api/event_logging/batch.
+
+        Telemetry endpoint - acknowledge and discard.
+        """
+        return {"status": "ok"}
 
     return router

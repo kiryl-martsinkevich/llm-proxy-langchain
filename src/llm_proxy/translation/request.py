@@ -2,7 +2,13 @@
 
 from typing import Any
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 
 from llm_proxy.models.anthropic import Message, MessagesRequest, TextBlock, Tool
 
@@ -24,41 +30,118 @@ def translate_content_block(block: dict[str, Any]) -> dict[str, Any]:
     return block
 
 
-def translate_message(msg: Message) -> BaseMessage:
-    """Translate a single Anthropic message to LangChain message."""
+def translate_assistant_message(msg: Message) -> list[BaseMessage]:
+    """Translate assistant message, extracting tool_use into tool_calls.
+
+    Anthropic puts tool_use blocks in content[], but OpenAI/LangChain
+    expects them in the tool_calls field of AIMessage.
+    """
     # Handle string content
     if isinstance(msg.content, str):
-        if msg.role == "user":
-            return HumanMessage(content=msg.content)
-        else:
-            return AIMessage(content=msg.content)
+        return [AIMessage(content=msg.content)]
 
-    # Handle content blocks (multimodal)
-    content_blocks = [translate_content_block(block) for block in msg.content]
+    text_parts = []
+    tool_calls = []
 
-    if msg.role == "user":
-        return HumanMessage(content=content_blocks)
+    for block in msg.content:
+        if block["type"] == "text":
+            text_parts.append(block["text"])
+        elif block["type"] == "tool_use":
+            tool_calls.append({
+                "id": block["id"],
+                "name": block["name"],
+                "args": block["input"],
+            })
+
+    text = "\n".join(text_parts) if text_parts else ""
+
+    if tool_calls:
+        return [AIMessage(content=text, tool_calls=tool_calls)]
     else:
-        return AIMessage(content=content_blocks)
+        return [AIMessage(content=text)]
+
+
+def translate_user_message(msg: Message) -> list[BaseMessage]:
+    """Translate user message, splitting tool_results into ToolMessages.
+
+    Anthropic puts tool_result blocks in user message content[], but
+    OpenAI/LangChain expects separate messages with role="tool".
+    """
+    # Handle string content
+    if isinstance(msg.content, str):
+        return [HumanMessage(content=msg.content)]
+
+    tool_results = []
+    other_content = []
+
+    for block in msg.content:
+        if block["type"] == "tool_result":
+            tool_results.append(block)
+        else:
+            other_content.append(translate_content_block(block))
+
+    result: list[BaseMessage] = []
+
+    # Tool results become ToolMessage instances (must come first to maintain order)
+    for tr in tool_results:
+        content = tr.get("content", "")
+        # Handle content that might be a list of blocks
+        if isinstance(content, list):
+            text_parts = []
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    text_parts.append(item.get("text", ""))
+                elif isinstance(item, str):
+                    text_parts.append(item)
+            content = "\n".join(text_parts)
+        result.append(ToolMessage(
+            content=str(content),
+            tool_call_id=tr["tool_use_id"],
+        ))
+
+    # Remaining content becomes HumanMessage
+    if other_content:
+        result.append(HumanMessage(content=other_content))
+
+    return result
+
+
+# Instruction to inject into system prompt for better tool usage
+TOOL_USAGE_INSTRUCTION = """
+IMPORTANT: You have access to tools. When asked to create, write, or save files, you MUST use the Write tool - do not output file contents as text. When asked to read files, use the Read tool. When asked to run commands, use the Bash tool. Never say "I can't save files" or "copy this code" - use your tools instead.
+"""
 
 
 def translate_messages(
-    messages: list[Message], system: str | list[TextBlock] | None
+    messages: list[Message],
+    system: str | list[TextBlock] | None,
+    has_tools: bool = False,
 ) -> list[BaseMessage]:
     """Translate Anthropic messages to LangChain messages."""
     result: list[BaseMessage] = []
 
+    # Build system message with optional tool usage instruction
+    system_text = ""
     if system:
         # Handle both string and list of TextBlock formats
         if isinstance(system, str):
-            result.append(SystemMessage(content=system))
+            system_text = system
         else:
             # Concatenate text from all system blocks
             system_text = "\n".join(block.text for block in system)
-            result.append(SystemMessage(content=system_text))
+
+    # Inject tool usage instruction when tools are available
+    if has_tools:
+        system_text = TOOL_USAGE_INSTRUCTION + "\n" + system_text
+
+    if system_text:
+        result.append(SystemMessage(content=system_text))
 
     for msg in messages:
-        result.append(translate_message(msg))
+        if msg.role == "assistant":
+            result.extend(translate_assistant_message(msg))
+        else:  # user
+            result.extend(translate_user_message(msg))
 
     return result
 
