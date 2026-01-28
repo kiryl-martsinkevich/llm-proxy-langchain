@@ -65,6 +65,6 @@ server:
 
         assert config.models["claude-3-haiku-20240307"].backend == "ollama"
         assert config.backends["databricks"].api_key == "secret123"
-        assert config.server["port"] == 9000
+        assert config.server.port == 9000
 
     os.unlink(f.name)

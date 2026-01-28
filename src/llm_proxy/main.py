@@ -86,8 +86,8 @@ def main():
     config = load_config(config_path)
 
     # Use config values, with env var overrides
-    host = os.environ.get("LLM_PROXY_HOST", config.server.get("host", "127.0.0.1"))
-    port = int(os.environ.get("LLM_PROXY_PORT", config.server.get("port", 8000)))
+    host = os.environ.get("LLM_PROXY_HOST", config.server.host)
+    port = int(os.environ.get("LLM_PROXY_PORT", config.server.port))
     uvicorn.run(create_app, host=host, port=port, reload=False, factory=True)
 
 

@@ -1,6 +1,6 @@
 """Configuration models for LLM Proxy."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class BackendConfig(BaseModel):
@@ -18,7 +18,7 @@ class ModelMapping(BaseModel):
 
 
 class ServerConfig(BaseModel):
-    """Server configuration with defaults."""
+    """Server configuration."""
 
     host: str = "0.0.0.0"
     port: int = 8080
@@ -29,4 +29,4 @@ class ProxyConfig(BaseModel):
 
     models: dict[str, ModelMapping]
     backends: dict[str, BackendConfig]
-    server: dict[str, str | int] = {"host": "0.0.0.0", "port": 8080}
+    server: ServerConfig = Field(default_factory=ServerConfig)
