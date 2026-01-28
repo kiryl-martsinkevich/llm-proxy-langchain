@@ -40,7 +40,7 @@ def test_proxy_config_complete():
     )
     assert "claude-3-haiku-20240307" in config.models
     assert "ollama" in config.backends
-    assert config.server["port"] == 8080
+    assert config.server.port == 8080
 
 
 def test_proxy_config_default_server():
@@ -49,5 +49,5 @@ def test_proxy_config_default_server():
         models={},
         backends={},
     )
-    assert config.server["host"] == "0.0.0.0"
-    assert config.server["port"] == 8080
+    assert config.server.host == "0.0.0.0"
+    assert config.server.port == 8080
