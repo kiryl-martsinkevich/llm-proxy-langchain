@@ -87,8 +87,9 @@ def create_messages_router(config: ProxyConfig) -> APIRouter:
             logger.error(f"Backend error: {e}")
             return make_error_response(502, "api_error", f"Backend error: {e}")
 
+        logger.info(f"Raw LLM response: {ai_message}")
         response = translate_response(ai_message, request.model)
-        logger.info(f"Response: {response}")
+        logger.info(f"Translated response: {response}")
         return response
 
     @router.post("/v1/messages/count_tokens")
