@@ -9,6 +9,7 @@ class BackendConfig(BaseModel):
     base_url: str
     api_key: str | None = None
     verify_ssl: bool = True
+    disable_streaming: bool = False
 
 
 class ModelMapping(BaseModel):

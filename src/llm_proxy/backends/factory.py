@@ -30,4 +30,7 @@ def create_chat_model(backend_config: BackendConfig, model_name: str) -> ChatOpe
         kwargs["http_client"] = httpx.Client(verify=False)
         kwargs["http_async_client"] = httpx.AsyncClient(verify=False)
 
+    if backend_config.disable_streaming:
+        kwargs["disable_streaming"] = True
+
     return ChatOpenAI(**kwargs)

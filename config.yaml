@@ -21,6 +21,7 @@ backends:
     base_url: "https://api.openai.com/v1"
     api_key: "${OPENAI_API_KEY}"
     # verify_ssl: false  # Uncomment to disable SSL verification
+    # disable_streaming: true  # Uncomment to use non-streaming API calls internally
 
 # Server settings
 server:
