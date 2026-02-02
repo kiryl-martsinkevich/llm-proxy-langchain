@@ -20,6 +20,7 @@ backends:
   openai:
     base_url: "https://api.openai.com/v1"
     api_key: "${OPENAI_API_KEY}"
+    # verify_ssl: false  # Uncomment to disable SSL verification
 
 # Server settings
 server:
