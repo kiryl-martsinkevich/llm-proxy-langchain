@@ -62,7 +62,7 @@ def create_messages_router(config: ProxyConfig) -> APIRouter:
         # Log headers (excluding sensitive auth headers)
         headers = {k: v for k, v in raw_request.headers.items() if k.lower() not in ("authorization", "x-api-key")}
         logger.info(f"Request headers: {headers}")
-        logger.info(f"Request: {request}")
+        logger.info(f"Request body: {request.model_dump_json()}")
 
         try:
             backend_config, backend_model = resolve_backend(request.model, config)
