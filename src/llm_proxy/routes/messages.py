@@ -57,10 +57,12 @@ def create_messages_router(config: ProxyConfig) -> APIRouter:
     router = APIRouter()
 
     @router.post("/v1/messages")
-    async def create_message(request: MessagesRequest) -> MessagesResponse:
+    async def create_message(request: MessagesRequest, raw_request: Request) -> MessagesResponse:
         """Handle POST /v1/messages."""
-        tool_count = len(request.tools) if request.tools else 0
-        logger.info(f"Request: model={request.model} stream={request.stream} tools={tool_count}")
+        # Log headers (excluding sensitive auth headers)
+        headers = {k: v for k, v in raw_request.headers.items() if k.lower() not in ("authorization", "x-api-key")}
+        logger.info(f"Request headers: {headers}")
+        logger.info(f"Request: model={request.model} stream={request.stream} messages={request.messages}")
 
         try:
             backend_config, backend_model = resolve_backend(request.model, config)
@@ -86,7 +88,7 @@ def create_messages_router(config: ProxyConfig) -> APIRouter:
             return make_error_response(502, "api_error", f"Backend error: {e}")
 
         response = translate_response(ai_message, request.model)
-        logger.info(f"Response: stop_reason={response.stop_reason} blocks={[b.type for b in response.content]}")
+        logger.info(f"Response: {response}")
         return response
 
     @router.post("/v1/messages/count_tokens")
